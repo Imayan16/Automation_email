@@ -46,43 +46,46 @@ if GEMINI_API_KEY:
 else:
     print("CRITICAL ERROR: GEMINI_API_KEY environment variable not found. Gemini client not initialized.")
 
+
 # --- Knowledge Base & Persona Configuration ---
 DATA_SCIENCE_KNOWLEDGE = """
-# Data Science Project & Service Knowledge Base (Updated for Time Series and Project Inquiries)
+# Data Science Project & Service Knowledge Base
 
-## 1. Core Services Offered:
-- Predictive Modeling: ARIMA, SARIMA, Prophet, LSTM
-- Machine Learning lifecycle projects
-- NLP, Computer Vision, MLOps, ETL, Dashboards
+## Core Services
+- Time Series (ARIMA, LSTM, Prophet)
+- ML pipelines
+- NLP
+- Computer Vision
+- MLOps
+- Dashboards & Data Engineering
 
-## 2. Time Series Guidance:
-- ARIMA = short-term / interpretable
-- LSTM = complex / long-term
+## Model Guidance
+- ARIMA = short / interpretable
+- LSTM = long-term / complex patterns
 
-## 3. Engagement Process:
-Discovery → Data Prep → Modeling → Deployment → Monitoring
-
-## 4. Meeting Availability:
+## Meeting Availability
 Mon / Wed / Fri — 2PM to 5PM IST
 """
 
-# Agent 1 Condition
 AUTOMATION_CONDITION = (
-    "Does the incoming email contain a technical question or project inquiry related to Data Science, ML, DL, "
-    "Data Engineering, Statistical Analysis, or services listed?"
+    "Does the incoming email contain a technical question or project inquiry "
+    "related to Data Science, Machine Learning, Deep Learning, Data Engineering, "
+    "Statistics, or AI services?"
 )
 
-# Persona
 AGENTIC_SYSTEM_INSTRUCTIONS = (
     """You are EMAYAN R M, a Senior Data Scientist and AI/ML Engineering Specialist.
 
-YOUR CORE RESPONSIBILITIES:
-- ONLY respond authentically as EMAYAN R M.
-- Generate detailed, professional, value-driven email responses.
+RESPONSIBILITIES:
+- ONLY reply as EMAYAN R M
+- Provide helpful, professional replies
+- Focus on clarity and value
 
-FORMATTING RULES:
-- Plain text only.
-- Always sign: 'Best regards,\\nEMAYAN R M'
+FORMAT RULES:
+- Plain text only
+- Always sign exactly:
+Best regards,
+EMAYAN R M
 """
 )
 
@@ -106,11 +109,12 @@ RESPONSE_SCHEMA_JSON = {
 
 response_schema = RESPONSE_SCHEMA_JSON
 
-# --- Email Helpers ---
+
+# --- EMAIL HELPERS ---
 
 def _send_smtp_email(to_email, subject, content):
     if not EMAIL_ADDRESS or not EMAIL_PASSWORD:
-        print("ERROR: Email credentials not available.")
+        print("ERROR: Email credentials missing.")
         return False
 
     try:
@@ -125,14 +129,16 @@ def _send_smtp_email(to_email, subject, content):
             server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
             server.send_message(msg)
 
+        print("STATUS: Email sent.")
         return True
     except Exception as e:
-        print(f"ERROR sending email: {e}")
+        print(f"SMTP ERROR: {e}")
         return False
 
 
 def _fetch_latest_unread_email():
     if not EMAIL_ADDRESS or not EMAIL_PASSWORD:
+        print("ERROR: Email credentials missing.")
         return None, None, None
 
     try:
@@ -141,20 +147,25 @@ def _fetch_latest_unread_email():
         mail.select("inbox")
 
         status, data = mail.search(None, 'UNSEEN')
+        
         ids = data[0].split()
         if not ids:
+            print("STATUS: No unread emails.")
             return None, None, None
 
         latest_id = ids[-1]
         mail.store(latest_id, '+FLAGS', '\\Seen')
+
         status, msg_data = mail.fetch(latest_id, "(RFC822)")
         email_message = email.message_from_bytes(msg_data[0][1])
 
         from_header = email_message.get("From", "")
         subject = email_message.get("Subject", "No Subject")
-        from_match = re.search(r"<([^>]+)>", from_header)
-        from_email = from_match.group(1) if from_match else from_header
 
+        match = re.search(r"<([^>]+)>", from_header)
+        from_email = match.group(1) if match else from_header
+
+        body = ""
         if email_message.is_multipart():
             for part in email_message.walk():
                 if part.get_content_type() == "text/plain":
@@ -177,8 +188,7 @@ def _run_ai_agent(email_data):
 
     user_prompt = (
         f"{DATA_SCIENCE_KNOWLEDGE}\n\n"
-        f"CONDITION: {AUTOMATION_CONDITION}\n\n"
-        f"Ensure replies end with: Best regards,\\nEMAYAN R M\n\n"
+        f"Ensure replies always end with:\nBest regards,\\nEMAYAN R M\n\n"
         f"FROM: {email_data['from_email']}\n"
         f"SUBJECT: {email_data['subject']}\n"
         f"BODY:\n{email_data['body']}"
@@ -198,11 +208,11 @@ def _run_ai_agent(email_data):
             config=config,
         )
 
-        raw_content = response.text.strip()
-        json_match = re.search(r"\{.*\}", raw_content, re.DOTALL)
+        raw = response.text.strip()
+        match = re.search(r"\{.*\}", raw, re.DOTALL)
 
-        if json_match:
-            return json.loads(json_match.group(0))
+        if match:
+            return json.loads(match.group(0))
 
     except Exception as e:
         print(f"AI ERROR: {e}")
@@ -211,11 +221,10 @@ def _run_ai_agent(email_data):
 
 
 def main_agent_workflow():
-    print("STARTING AGENT RUN...")
+    print("=== START WORKFLOW ===")
 
     from_email, subject, body = _fetch_latest_unread_email()
     if not from_email:
-        print("No unread emails.")
         return
 
     ai_output = _run_ai_agent(
@@ -223,7 +232,7 @@ def main_agent_workflow():
     )
 
     SAFE_DEFAULT_REPLY = (
-        "Thank you for reaching out. I'm reviewing your message and will respond shortly.\n\n"
+        "Thank you for reaching out. I will review your message and respond shortly.\n\n"
         "Best regards,\nEMAYAN R M"
     )
 
@@ -247,7 +256,11 @@ def main_agent_workflow():
 
     _send_smtp_email(from_email, f"Re: {subject}", reply)
 
-    print("DONE.")
+    print("=== DONE ===")
+
+
+if __name__ == "__main__":
+    main_agent_workflow()
 
 
 if __name__ == "__main__":
